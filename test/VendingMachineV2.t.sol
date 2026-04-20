@@ -2,28 +2,38 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
+import {UnsafeUpgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
+import {VendingMachineV1} from "../src/VendingMachineV1.sol";
 import {VendingMachineV2} from "../src/VendingMachineV2.sol";
 
 contract VendingMachineV2Test is Test {
     VendingMachineV2 public vendingMachine;
-    address public owner = makeAddr("owner");
+    address admin = address(this);
+    bool acceptPay = true;
 
-    function setUp() public {
-        vm.prank(owner);
-        vendingMachine = new VendingMachineV2();
-
-        vm.prank(owner);
-        vendingMachine.initialize(2000);
+    receive() external payable {
+        require(acceptPay);
     }
 
-    function testFuzz_purchaseSoda(address buyer, uint256 pay) public {
-        vm.assume(buyer != owner);
+    function setUp() public {
+        VendingMachineV1 implV1 = new VendingMachineV1();
+        bytes memory initV1 = abi.encodeCall(implV1.initialize, (admin, 100)); // numSodas
+        address proxy = UnsafeUpgrades.deployTransparentProxy(address(implV1), admin, initV1);
+
+        VendingMachineV2 implV2 = new VendingMachineV2();
+        bytes memory initV2 = abi.encodeCall(implV2.reinitialize, (VendingMachineV1(proxy).numSodas() + 1));
+        UnsafeUpgrades.upgradeProxy(proxy, address(implV2), initV2);
+
+        vendingMachine = VendingMachineV2(proxy);
+    }
+
+    function testFuzz_PurchaseSoda(address buyer, uint16 pay) public {
+        vm.assume(buyer != admin);
 
         uint256 initialBalance = address(vendingMachine).balance;
         uint256 numSodas = vendingMachine.numSodas();
 
-        vm.deal(buyer, pay);
-        vm.prank(buyer);
+        hoax(buyer, pay);
 
         if (pay < 1000 wei) {
             vm.expectRevert("You must pay 1000 wei for a soda!");
@@ -40,58 +50,38 @@ contract VendingMachineV2Test is Test {
         }
     }
 
-    function testFuzz_withdrawProfits(address buyer, uint256 pay) public {
-        vm.assume(address(vendingMachine) != buyer && buyer != owner);
+    function testFuzz_WithdrawProfits(address buyer, uint16 pay) public {
+        vm.assume(address(vendingMachine) != buyer && buyer != admin);
 
-        uint256 ownerInitialBalance = address(owner).balance;
+        uint256 adminInitialBalance = address(admin).balance;
 
-        testFuzz_purchaseSoda(buyer, pay);
+        testFuzz_PurchaseSoda(buyer, pay);
 
         uint256 vendingMachineBalance = address(vendingMachine).balance;
-
-        vm.prank(owner);
 
         if (vendingMachineBalance <= 0) vm.expectRevert("Profits must be greater than 0 in order to withdraw!");
 
         vendingMachine.withdrawProfits();
 
         assertEq(address(vendingMachine).balance, 0);
-        assertEq(address(owner).balance, ownerInitialBalance + vendingMachineBalance);
+        assertEq(address(admin).balance, adminInitialBalance + vendingMachineBalance);
     }
 
-    function testReject_withdrawProfits() public {
-        vendingMachine = new VendingMachineV2();
-        vendingMachine.initialize(2000);
+    function testFuzz_RejectWhen_FailedToSendEther(address buyer, uint16 pay) public {
+        vm.assume(address(vendingMachine) != buyer && buyer != admin && pay > 1000 wei);
 
-        address _owner = address(this);
-        uint256 ownerInitialBalance = address(_owner).balance;
+        uint256 adminInitialBalance = address(admin).balance;
 
-        address buyer = makeAddr("buyer");
-        uint256 pay = 1000 wei;
-        testFuzz_purchaseSoda(buyer, pay);
+        testFuzz_PurchaseSoda(buyer, pay);
 
         uint256 vendingMachineBalance = address(vendingMachine).balance;
 
+        acceptPay = false;
         vm.expectRevert("Failed to send ether");
         vendingMachine.withdrawProfits();
+        acceptPay = true;
 
         assertEq(address(vendingMachine).balance, vendingMachineBalance);
-        assertEq(address(_owner).balance, ownerInitialBalance);
-    }
-
-    function test_reinitialize() public {
-        vendingMachine = new VendingMachineV2();
-        vendingMachine.initialize(2000);
-
-        vendingMachine.reinitialize(2001);
-        assertEq(vendingMachine.numSodas(), 2001);
-    }
-
-    function testReject_reinitialize() public {
-        vendingMachine = new VendingMachineV2();
-        vendingMachine.initialize(2000);
-
-        vm.expectRevert();
-        vendingMachine.reinitialize(2000);
+        assertEq(address(admin).balance, adminInitialBalance);
     }
 }

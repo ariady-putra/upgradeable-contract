@@ -2,17 +2,22 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
+import {UnsafeUpgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import {VendingMachineV1} from "../src/VendingMachineV1.sol";
 
 contract VendingMachineV1Test is Test {
     VendingMachineV1 public vendingMachine;
+    address admin = address(this);
 
     function setUp() public {
-        vendingMachine = new VendingMachineV1();
-        vendingMachine.initialize(100);
+        VendingMachineV1 impl = new VendingMachineV1();
+        bytes memory init = abi.encodeCall(impl.initialize, (admin, 100)); // numSodas
+        address proxy = UnsafeUpgrades.deployTransparentProxy(address(impl), admin, init);
+
+        vendingMachine = VendingMachineV1(proxy);
     }
 
-    function testFuzz_purchaseSoda(address buyer, uint256 pay) public {
+    function testFuzz_PurchaseSoda(address buyer, uint256 pay) public {
         vm.assume(address(this) != buyer && address(vendingMachine) != buyer);
 
         uint256 initialBalance = address(vendingMachine).balance;

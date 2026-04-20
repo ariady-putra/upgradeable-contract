@@ -7,11 +7,9 @@ import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import {VendingMachineV2} from "../src/VendingMachineV2.sol";
 
 contract VendingMachineV2Script is Script {
-    VendingMachineV2 public vendingMachine;
-    uint256 public numSodas;
-
     address public proxy;
     address public admin;
+    uint256 public numSodas;
 
     function setUp() public {
         admin = vm.envAddress("ADMIN_ADDRESS");
@@ -28,7 +26,7 @@ contract VendingMachineV2Script is Script {
 
         vm.stopBroadcast();
 
-        address implementation = Upgrades.getImplementationAddress(proxy);
-        console.log("Implementation Address", implementation);
+        address impl = Upgrades.getImplementationAddress(proxy);
+        console.log("Impl. Address:", impl);
     }
 }

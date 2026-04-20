@@ -14,9 +14,9 @@ contract VendingMachineV1 is Initializable, OwnableUpgradeable {
         _disableInitializers();
     }
 
-    function initialize(uint256 _numSodas) public initializer {
+    function initialize(address _initialOwner, uint256 _numSodas) public initializer {
         numSodas = _numSodas;
-        __Ownable_init(msg.sender);
+        __Ownable_init(_initialOwner);
     }
 
     function purchaseSoda() public payable {

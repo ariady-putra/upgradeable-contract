@@ -18,12 +18,12 @@ contract VendingMachineV2 is Initializable, OwnableUpgradeable {
         _disableInitializers();
     }
 
-    function initialize(uint256 _numSodas) public initializer {
+    function initialize(address _initialOwner, uint256 _numSodas) public initializer {
         numSodas = _numSodas;
-        __Ownable_init(msg.sender);
+        __Ownable_init(_initialOwner);
     }
 
-    /// @custom:oz-upgrades-unsafe-allow delegatecall
+    /// @custom:oz-upgrades-validate-as-initializer
     function reinitialize(uint256 _numSodas) public reinitializer(2) {
         require(_numSodas > numSodas);
         numSodas = _numSodas;

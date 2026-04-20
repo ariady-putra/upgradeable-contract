@@ -7,34 +7,30 @@ import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import {VendingMachineV1} from "../src/VendingMachineV1.sol";
 
 contract VendingMachineV1Script is Script {
-    VendingMachineV1 public vendingMachine;
+    address public admin;
     uint256 public numSodas;
 
-    address public initialOwnerAddressForProxyAdmin;
-
     function setUp() public {
-        initialOwnerAddressForProxyAdmin = vm.envAddress("ADMIN_ADDRESS");
-        numSodas = 100;
+        admin = vm.envAddress("ADMIN_ADDRESS");
+        numSodas = vm.promptUint("Num sodas");
     }
 
     function run() public {
-        vm.startBroadcast(initialOwnerAddressForProxyAdmin);
+        vm.startBroadcast(admin);
 
         address proxy = Upgrades.deployTransparentProxy(
-            "VendingMachineV1.sol",
-            initialOwnerAddressForProxyAdmin,
-            abi.encodeCall(VendingMachineV1.initialize, (numSodas))
+            "VendingMachineV1.sol", admin, abi.encodeCall(VendingMachineV1.initialize, (admin, numSodas))
         );
 
         vm.stopBroadcast();
 
-        address admin = Upgrades.getAdminAddress(proxy);
-        address implementation = Upgrades.getImplementationAddress(proxy);
+        address impl = Upgrades.getImplementationAddress(proxy);
+        address proxyAdmin = Upgrades.getAdminAddress(proxy);
 
-        console.log("Proxy Address", proxy);
-        console.log("Implementation Address", implementation);
+        console.log("Proxy Address:", proxy);
+        console.log("Impl. Address:", impl);
 
-        console.log("Admin Address", initialOwnerAddressForProxyAdmin);
-        console.log("Proxy Admin Address", admin);
+        console.log("Proxy Admin Address", proxyAdmin);
+        console.log("Admin Address", admin);
     }
 }
